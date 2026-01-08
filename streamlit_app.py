@@ -424,11 +424,13 @@ def main():
             st.markdown(f"<span style='color: #9ca3af; font-size: 1.5rem; font-weight: bold;'>Even</span>", unsafe_allow_html=True)
     with col4:
         position = len([d for d in drivers.values() if d['delta'] < driver_data['delta']]) + 1
-        st.metric("Position", f"P{position}/{len(drivers)}")
+        st.markdown("**Competitor Rank**")
+        st.markdown(f"<span style='font-size: 1.5rem; font-weight: bold;'>P{position}/{len(drivers)}</span>", unsafe_allow_html=True)
     
     st.divider()
     
     st.subheader("🏁 Corner Overalls")
+    st.markdown(f"*Compared to #{selected_driver}*")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -462,6 +464,7 @@ def main():
     st.divider()
     
     st.subheader("🟡 Turn 1/2 Sectors")
+    st.markdown(f"*Compared to #{selected_driver}*")
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -474,6 +477,7 @@ def main():
     st.divider()
     
     st.subheader("🔵 Turn 3/4 Sectors")
+    st.markdown(f"*Compared to #{selected_driver}*")
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -520,6 +524,7 @@ def main():
     ]
     
     colors = ['#4ade80' if d > 0 else '#f87171' if d < 0 else '#9ca3af' for d in deltas]
+    text_positions = ['outside' if abs(d) < 0.07 else 'inside' for d in deltas]
     
     fig = go.Figure()
     
@@ -528,17 +533,22 @@ def main():
         x=sectors, 
         y=deltas, 
         marker_color=colors, 
-        text=[f"{d:.3f}s {'faster' if d > 0 else 'slower' if d < 0 else 'even'}" for d in deltas], 
+        text=[f"{abs(d):.3f}s {'faster' if d > 0 else 'slower' if d < 0 else 'even'}" for d in deltas], 
         textposition='outside',
-        name='Sector Delta'
+        textfont=dict(size=10),
+        name='Sector Delta',
+        cliponaxis=False
     ))
     
-    # Trend line
+    # Smooth trend line using spline
+    import numpy as np
+    x_smooth = list(range(len(sectors)))
+    
     fig.add_trace(go.Scatter(
         x=sectors,
         y=deltas,
         mode='lines+markers',
-        line=dict(color='#facc15', width=3),
+        line=dict(color='#facc15', width=3, shape='spline', smoothing=1.0),
         marker=dict(size=8, color='#facc15'),
         name='Trend'
     ))
@@ -548,10 +558,11 @@ def main():
         yaxis_title="Time Delta (seconds)",
         xaxis_title="Track Sector",
         template="plotly_dark",
-        height=450,
-        yaxis=dict(range=[-0.1, 0.1]),
+        height=500,
+        yaxis=dict(range=[-0.12, 0.12]),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(t=80, b=60)
     )
     fig.add_hline(y=0, line_dash="dash", line_color="white", opacity=0.5)
     
