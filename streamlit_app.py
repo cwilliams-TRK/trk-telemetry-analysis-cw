@@ -117,9 +117,9 @@ def parse_smt_pdf(pdf_file):
                 if not text:
                     continue
                 
-                title_match = re.search(r'SMT Driver Compare: ([^,]+)', text)
+                title_match = re.search(r'SMT Driver Compare[:\s]+([^#]+)', text)
                 if title_match:
-                    session_info = title_match.group(1)
+                    session_info = title_match.group(1).strip()
                 
                 compare_match = re.search(r'#(\d+)\s+L[\d-]+\s+\(5 Lap Ave?:\s*([\d.]+)\)\s+vs\s+#(\d+)\s+L[\d-]+\s+\(5 Lap Ave?:\s*([\d.]+)\)', text)
                 
@@ -140,8 +140,8 @@ def parse_smt_pdf(pdf_file):
                     corner_data[car2_num] = generate_corner_data(delta)
         
         if not drivers:
-            st.warning("Could not extract driver data from PDF. Using default data.")
-            return load_default_data()
+            st.warning("Could not extract driver data from PDF. Please check the PDF format.")
+            return None, None, None
         
         return drivers, corner_data, session_info
         
@@ -309,11 +309,15 @@ def main():
                     st.write(f"Processing: {uploaded_file.name}")
                     result = parse_smt_pdf(uploaded_file)
                     
-                    if result[0]:
+                    if result is not None and len(result) == 3 and result[0] is not None:
                         drivers, corner_data, sess_info = result
                         all_drivers.update(drivers)
                         all_corner_data.update(corner_data)
                         session_info = sess_info
+                    elif result is not None and len(result) == 2:
+                        drivers, corner_data = result
+                        all_drivers.update(drivers)
+                        all_corner_data.update(corner_data)
             
             if all_drivers:
                 st.session_state.drivers = all_drivers
