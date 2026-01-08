@@ -6,8 +6,8 @@ import re
 import io
 
 st.set_page_config(
-    page_title="Ross Chastain #1 Telemetry Analysis",
-    page_icon="🏎️",
+    page_title="Trackhouse Telemetry Analysis Tool",
+    page_icon="https://www.trackhouseracingteam.com/favicon.ico",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -277,13 +277,15 @@ def display_sector_card(title, zone, data):
         st.markdown(f"{color} **{metric_name}:** {value}")
 
 def main():
-    st.markdown("# 🏎️ Ross Chastain #1 Telemetry Analysis")
+    # Trackhouse logo
+    st.image("Trackhouse-new-1.jpg", width=200)
+    st.markdown("# Trackhouse Telemetry Analysis Tool")
     
     st.sidebar.header("📁 Data Source")
     
     data_source = st.sidebar.radio(
         "Choose data source:",
-        ["Default Data", "Upload PDF"]
+        ["Upload PDF", "Default Data"]
     )
     
     if data_source == "Upload PDF":
@@ -325,10 +327,8 @@ def main():
                 st.session_state.corner_data = corner_data
         else:
             st.sidebar.info("👆 Upload PDF files to analyze")
-            if st.session_state.drivers is None:
-                drivers, corner_data = load_default_data()
-                st.session_state.drivers = drivers
-                st.session_state.corner_data = corner_data
+            st.session_state.drivers = None
+            st.session_state.corner_data = None
     else:
         drivers, corner_data = load_default_data()
         st.session_state.drivers = drivers
@@ -340,7 +340,15 @@ def main():
     session_info = st.session_state.session_info
     
     if not drivers:
-        st.warning("No data loaded. Please upload a PDF or use default data.")
+        st.info("👈 Upload a PDF file from the sidebar to get started.")
+        st.markdown("---")
+        st.markdown("### How to use:")
+        st.markdown("""
+1. Click **'Browse files'** in the sidebar
+2. Upload your SMT Driver Compare PDF(s)
+3. Select a competitor to analyze
+4. View detailed telemetry comparisons
+        """)
         return
     
     st.markdown(f"*{session_info} | Reference: #1 Ross Chastain*")
@@ -485,7 +493,7 @@ def main():
     st.plotly_chart(fig, use_container_width=True)
     
     st.divider()
-    st.caption("🏎️ Ross Chastain #1 Telemetry Analysis Tool | Built with Streamlit")
+    st.caption("Trackhouse Telemetry Analysis Tool | Built with Streamlit")
 
 if __name__ == "__main__":
     main()
