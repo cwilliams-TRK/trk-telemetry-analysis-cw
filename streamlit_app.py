@@ -285,7 +285,7 @@ def main():
     
     data_source = st.sidebar.radio(
         "Choose data source:",
-        ["Upload PDF", "Default Data"]
+        ["Upload PDF", "Example Data"]
     )
     
     if data_source == "Upload PDF":
@@ -333,7 +333,7 @@ def main():
         drivers, corner_data = load_default_data()
         st.session_state.drivers = drivers
         st.session_state.corner_data = corner_data
-        st.session_state.session_info = "Practice Session - Final Sticker Run Mid"
+        st.session_state.session_info = "Example Session - Practice Final Sticker Run"
     
     drivers = st.session_state.drivers
     corner_data = st.session_state.corner_data
