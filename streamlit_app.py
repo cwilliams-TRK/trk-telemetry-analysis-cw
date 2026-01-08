@@ -273,8 +273,16 @@ def display_sector_card(title, zone, data):
     ]
     
     for metric_name, (value, status) in metrics:
-        color = {"faster": "🟢", "slower": "🔴", "even": "⚪"}.get(status, "⚪")
-        st.markdown(f"{color} **{metric_name}:** {value}")
+        if status == "faster":
+            color = "#4ade80"
+            icon = "🟢"
+        elif status == "slower":
+            color = "#f87171"
+            icon = "🔴"
+        else:
+            color = "#9ca3af"
+            icon = "⚪"
+        st.markdown(f"{icon} **{metric_name}:** <span style='color: {color};'>{value}</span>", unsafe_allow_html=True)
 
 def main():
     # Trackhouse logo
@@ -385,12 +393,35 @@ def main():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        delta_color = "normal" if driver_data['delta'] >= 0 else "inverse"
-        st.metric("Total Delta", f"{driver_data['delta']:+.3f}s", delta_color=delta_color)
+        if driver_data['delta'] > 0:
+            st.markdown("**Total Delta**")
+            st.markdown(f"<span style='color: #4ade80; font-size: 1.5rem; font-weight: bold;'>{abs(driver_data['delta']):.3f}s faster</span>", unsafe_allow_html=True)
+        elif driver_data['delta'] < 0:
+            st.markdown("**Total Delta**")
+            st.markdown(f"<span style='color: #f87171; font-size: 1.5rem; font-weight: bold;'>{abs(driver_data['delta']):.3f}s slower</span>", unsafe_allow_html=True)
+        else:
+            st.markdown("**Total Delta**")
+            st.markdown(f"<span style='color: #9ca3af; font-size: 1.5rem; font-weight: bold;'>Even</span>", unsafe_allow_html=True)
     with col2:
-        st.metric("T1/2 Delta", f"{t12_total:+.3f}s")
+        if t12_total > 0:
+            st.markdown("**T1/2 Delta**")
+            st.markdown(f"<span style='color: #4ade80; font-size: 1.5rem; font-weight: bold;'>{abs(t12_total):.3f}s faster</span>", unsafe_allow_html=True)
+        elif t12_total < 0:
+            st.markdown("**T1/2 Delta**")
+            st.markdown(f"<span style='color: #f87171; font-size: 1.5rem; font-weight: bold;'>{abs(t12_total):.3f}s slower</span>", unsafe_allow_html=True)
+        else:
+            st.markdown("**T1/2 Delta**")
+            st.markdown(f"<span style='color: #9ca3af; font-size: 1.5rem; font-weight: bold;'>Even</span>", unsafe_allow_html=True)
     with col3:
-        st.metric("T3/4 Delta", f"{t34_total:+.3f}s")
+        if t34_total > 0:
+            st.markdown("**T3/4 Delta**")
+            st.markdown(f"<span style='color: #4ade80; font-size: 1.5rem; font-weight: bold;'>{abs(t34_total):.3f}s faster</span>", unsafe_allow_html=True)
+        elif t34_total < 0:
+            st.markdown("**T3/4 Delta**")
+            st.markdown(f"<span style='color: #f87171; font-size: 1.5rem; font-weight: bold;'>{abs(t34_total):.3f}s slower</span>", unsafe_allow_html=True)
+        else:
+            st.markdown("**T3/4 Delta**")
+            st.markdown(f"<span style='color: #9ca3af; font-size: 1.5rem; font-weight: bold;'>Even</span>", unsafe_allow_html=True)
     with col4:
         position = len([d for d in drivers.values() if d['delta'] < driver_data['delta']]) + 1
         st.metric("Position", f"P{position}/{len(drivers)}")
@@ -402,23 +433,31 @@ def main():
     
     with col1:
         st.markdown("### T1/2 Overall")
-        t12_time, _ = format_lap_time(t12_total)
-        t12_entry, _ = format_speed(analysis['turn12']['entry1']['entrySpeed'])
-        t12_exit, _ = format_speed(analysis['turn12']['exit2']['exitSpeed'])
+        t12_time, t12_status = format_lap_time(t12_total)
+        t12_entry, t12_entry_status = format_speed(analysis['turn12']['entry1']['entrySpeed'])
+        t12_exit, t12_exit_status = format_speed(analysis['turn12']['exit2']['exitSpeed'])
         
-        st.markdown(f"**Total Time Diff:** {t12_time}")
-        st.markdown(f"**Entry Speed Diff:** {t12_entry}")
-        st.markdown(f"**Exit Speed Diff:** {t12_exit}")
+        t12_time_color = "#4ade80" if t12_status == "faster" else "#f87171" if t12_status == "slower" else "#9ca3af"
+        t12_entry_color = "#4ade80" if t12_entry_status == "faster" else "#f87171" if t12_entry_status == "slower" else "#9ca3af"
+        t12_exit_color = "#4ade80" if t12_exit_status == "faster" else "#f87171" if t12_exit_status == "slower" else "#9ca3af"
+        
+        st.markdown(f"**Total Time Diff:** <span style='color: {t12_time_color};'>{t12_time}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Entry Speed Diff:** <span style='color: {t12_entry_color};'>{t12_entry}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Exit Speed Diff:** <span style='color: {t12_exit_color};'>{t12_exit}</span>", unsafe_allow_html=True)
     
     with col2:
         st.markdown("### T3/4 Overall")
-        t34_time, _ = format_lap_time(t34_total)
-        t34_entry, _ = format_speed(analysis['turn34']['entry3']['entrySpeed'])
-        t34_exit, _ = format_speed(analysis['turn34']['exit4']['exitSpeed'])
+        t34_time, t34_status = format_lap_time(t34_total)
+        t34_entry, t34_entry_status = format_speed(analysis['turn34']['entry3']['entrySpeed'])
+        t34_exit, t34_exit_status = format_speed(analysis['turn34']['exit4']['exitSpeed'])
         
-        st.markdown(f"**Total Time Diff:** {t34_time}")
-        st.markdown(f"**Entry Speed Diff:** {t34_entry}")
-        st.markdown(f"**Exit Speed Diff:** {t34_exit}")
+        t34_time_color = "#4ade80" if t34_status == "faster" else "#f87171" if t34_status == "slower" else "#9ca3af"
+        t34_entry_color = "#4ade80" if t34_entry_status == "faster" else "#f87171" if t34_entry_status == "slower" else "#9ca3af"
+        t34_exit_color = "#4ade80" if t34_exit_status == "faster" else "#f87171" if t34_exit_status == "slower" else "#9ca3af"
+        
+        st.markdown(f"**Total Time Diff:** <span style='color: {t34_time_color};'>{t34_time}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Entry Speed Diff:** <span style='color: {t34_entry_color};'>{t34_entry}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Exit Speed Diff:** <span style='color: {t34_exit_color};'>{t34_exit}</span>", unsafe_allow_html=True)
     
     st.divider()
     
@@ -482,15 +521,37 @@ def main():
     
     colors = ['#4ade80' if d > 0 else '#f87171' if d < 0 else '#9ca3af' for d in deltas]
     
-    fig = go.Figure(data=[
-        go.Bar(x=sectors, y=deltas, marker_color=colors, text=[f"{d:+.3f}s" for d in deltas], textposition='outside')
-    ])
+    fig = go.Figure()
+    
+    # Bar chart
+    fig.add_trace(go.Bar(
+        x=sectors, 
+        y=deltas, 
+        marker_color=colors, 
+        text=[f"{d:.3f}s {'faster' if d > 0 else 'slower' if d < 0 else 'even'}" for d in deltas], 
+        textposition='outside',
+        name='Sector Delta'
+    ))
+    
+    # Trend line
+    fig.add_trace(go.Scatter(
+        x=sectors,
+        y=deltas,
+        mode='lines+markers',
+        line=dict(color='#facc15', width=3),
+        marker=dict(size=8, color='#facc15'),
+        name='Trend'
+    ))
+    
     fig.update_layout(
-        title=f"Sector Deltas vs #{selected_driver} (Green = Ross Faster)",
+        title=f"Sector Deltas vs #{selected_driver} (Green = Faster, Red = Slower)",
         yaxis_title="Time Delta (seconds)",
         xaxis_title="Track Sector",
         template="plotly_dark",
-        height=400
+        height=450,
+        yaxis=dict(range=[-0.1, 0.1]),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     fig.add_hline(y=0, line_dash="dash", line_color="white", opacity=0.5)
     
