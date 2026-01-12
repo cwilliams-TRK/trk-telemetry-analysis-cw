@@ -25,6 +25,8 @@ if 'corner_data' not in st.session_state:
     st.session_state.corner_data = None
 if 'session_info' not in st.session_state:
     st.session_state.session_info = "Practice Session"
+if 'uploaded_image' not in st.session_state:
+    st.session_state.uploaded_image = None
 
 def load_default_data():
     drivers = {
@@ -293,7 +295,7 @@ def main():
     
     data_source = st.sidebar.radio(
         "Choose data source:",
-        ["Upload PDF", "Example Data"]
+        ["Upload PDF", "Upload Image + Manual Entry", "Example Data"]
     )
     
     if data_source == "Upload PDF":
@@ -341,6 +343,81 @@ def main():
             st.sidebar.info("👆 Upload PDF files to analyze")
             st.session_state.drivers = None
             st.session_state.corner_data = None
+    
+    elif data_source == "Upload Image + Manual Entry":
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### Upload Screenshot")
+        
+        uploaded_image = st.sidebar.file_uploader(
+            "Upload telemetry screenshot",
+            type=['png', 'jpg', 'jpeg'],
+            help="Upload a screenshot of your telemetry comparison"
+        )
+        
+        if uploaded_image:
+            st.session_state.uploaded_image = uploaded_image
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### Manual Data Entry")
+        
+        session_name = st.sidebar.text_input("Session Name", value="Practice Session")
+        reference_car = st.sidebar.text_input("Reference Car #", value="1")
+        
+        st.sidebar.markdown("#### Add Competitor")
+        comp_car = st.sidebar.text_input("Competitor Car #", value="")
+        comp_lap_time = st.sidebar.number_input("Competitor Lap Time (s)", value=28.500, format="%.3f", step=0.001)
+        ref_lap_time = st.sidebar.number_input("Reference Lap Time (s)", value=28.723, format="%.3f", step=0.001)
+        
+        # Corner data inputs
+        st.sidebar.markdown("#### T1/2 Deltas (+ = ref faster)")
+        t12_entry = st.sidebar.number_input("T1 Entry (s)", value=0.000, format="%.3f", step=0.001, key="t12e")
+        t12_apex = st.sidebar.number_input("T1/2 Apex (s)", value=0.000, format="%.3f", step=0.001, key="t12a")
+        t12_exit = st.sidebar.number_input("T2 Exit (s)", value=0.000, format="%.3f", step=0.001, key="t12x")
+        
+        st.sidebar.markdown("#### T3/4 Deltas (+ = ref faster)")
+        t34_entry = st.sidebar.number_input("T3 Entry (s)", value=0.000, format="%.3f", step=0.001, key="t34e")
+        t34_apex = st.sidebar.number_input("T3/4 Apex (s)", value=0.000, format="%.3f", step=0.001, key="t34a")
+        t34_exit = st.sidebar.number_input("T4 Exit (s)", value=0.000, format="%.3f", step=0.001, key="t34x")
+        
+        if st.sidebar.button("Add Competitor", type="primary"):
+            if comp_car:
+                delta = ref_lap_time - comp_lap_time
+                
+                if st.session_state.drivers is None:
+                    st.session_state.drivers = {}
+                    st.session_state.corner_data = {}
+                
+                st.session_state.drivers[comp_car] = {
+                    'lap': comp_lap_time,
+                    'delta': -delta
+                }
+                
+                st.session_state.corner_data[comp_car] = {
+                    'turn12': {
+                        'entry1': {'lapTime': t12_entry, 'entrySpeed': t12_entry * 8, 'brakePoint': -t12_entry * 50, 'peakBrake': t12_entry * 100, 'wallDist': t12_entry * 10, 'throttleDist': -t12_entry * 60, 'exitSpeed': t12_entry * 5},
+                        'apex12': {'lapTime': t12_apex, 'entrySpeed': t12_apex * 6, 'brakePoint': 0, 'peakBrake': t12_apex * 80, 'wallDist': -t12_apex * 8, 'throttleDist': -t12_apex * 40, 'exitSpeed': t12_apex * 4},
+                        'exit2': {'lapTime': t12_exit, 'entrySpeed': t12_exit * 3, 'brakePoint': 0, 'peakBrake': 0, 'wallDist': t12_exit * 15, 'throttleDist': -t12_exit * 30, 'exitSpeed': t12_exit * 6}
+                    },
+                    'turn34': {
+                        'entry3': {'lapTime': t34_entry, 'entrySpeed': t34_entry * 7, 'brakePoint': -t34_entry * 45, 'peakBrake': t34_entry * 90, 'wallDist': -t34_entry * 12, 'throttleDist': -t34_entry * 50, 'exitSpeed': t34_entry * 4},
+                        'apex34': {'lapTime': t34_apex, 'entrySpeed': t34_apex * 5, 'brakePoint': 0, 'peakBrake': t34_apex * 70, 'wallDist': t34_apex * 6, 'throttleDist': -t34_apex * 35, 'exitSpeed': t34_apex * 3},
+                        'exit4': {'lapTime': t34_exit, 'entrySpeed': t34_exit * 8, 'brakePoint': 0, 'peakBrake': 0, 'wallDist': t34_exit * 18, 'throttleDist': -t34_exit * 70, 'exitSpeed': t34_exit * 9}
+                    }
+                }
+                
+                st.session_state.session_info = session_name
+                st.sidebar.success(f"✅ Added #{comp_car}")
+                st.rerun()
+        
+        if st.sidebar.button("Clear All Data"):
+            st.session_state.drivers = None
+            st.session_state.corner_data = None
+            st.session_state.uploaded_image = None
+            st.rerun()
+        
+        if st.session_state.drivers:
+            st.sidebar.success(f"✅ {len(st.session_state.drivers)} competitor(s) loaded")
+    
     else:
         drivers, corner_data = load_default_data()
         st.session_state.drivers = drivers
@@ -363,8 +440,14 @@ def main():
         """)
         return
     
-    st.markdown(f"*{session_info} | Reference: #1 Ross Chastain*")
+    st.markdown(f"*{session_info} | Reference: #1*")
     st.divider()
+    
+    # Display uploaded image if exists
+    if st.session_state.uploaded_image is not None:
+        st.subheader("📸 Reference Screenshot")
+        st.image(st.session_state.uploaded_image, use_container_width=True)
+        st.divider()
     
     st.sidebar.markdown("---")
     st.sidebar.header("🏁 Select Competitor")
