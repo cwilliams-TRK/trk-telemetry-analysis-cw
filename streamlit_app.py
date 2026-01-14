@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import pdfplumber
 import re
-import io
 
 st.set_page_config(
     page_title="Trackhouse Telemetry Analysis Tool",
@@ -25,6 +24,72 @@ if 'corner_data' not in st.session_state:
     st.session_state.corner_data = None
 if 'session_info' not in st.session_state:
     st.session_state.session_info = "Practice Session"
+
+def parse_smt_pdf(pdf_file):
+    """Parse SMT Driver Compare PDF and extract telemetry data"""
+    drivers = {}
+    corner_data = {}
+    session_info = "Uploaded Session"
+    
+    try:
+        with pdfplumber.open(pdf_file) as pdf:
+            for page_num, page in enumerate(pdf.pages):
+                text = page.extract_text()
+                if not text:
+                    continue
+                
+                # Extract session info
+                session_match = re.search(r'SMT Driver Compare:\s*([^#]+)', text)
+                if session_match:
+                    session_info = session_match.group(1).strip().rstrip(',')
+                
+                # Pattern: #1 L23-L31 (8 Lap Ave: 31.549) vs #5 L28-L33 (6 Lap Ave: 31.456)
+                compare_match = re.search(
+                    r'#(\d+)\s+L[\d-]+\s+\((\d+)\s+Lap\s+Ave:\s*([\d.]+)\)\s+vs\s+#(\d+)\s+L[\d-]+\s+\((\d+)\s+Lap\s+Ave:\s*([\d.]+)\)',
+                    text
+                )
+                
+                if compare_match:
+                    ref_car = compare_match.group(1)
+                    ref_lap = float(compare_match.group(3))
+                    comp_car = compare_match.group(4)
+                    comp_lap = float(compare_match.group(6))
+                    
+                    # Delta: positive = reference is slower, negative = reference is faster
+                    delta = ref_lap - comp_lap
+                    
+                    if comp_car not in drivers:
+                        drivers[comp_car] = {
+                            'lap': comp_lap,
+                            'delta': -delta  # Flip sign: positive = ref faster
+                        }
+                        corner_data[comp_car] = generate_corner_data(-delta)
+        
+        if not drivers:
+            return None, None, None
+        
+        return drivers, corner_data, session_info
+        
+    except Exception as e:
+        return None, None, None
+
+def generate_corner_data(total_delta):
+    """Generate estimated corner data based on total delta"""
+    t12_delta = total_delta * 0.5
+    t34_delta = total_delta * 0.5
+    
+    return {
+        'turn12': {
+            'entry1': {'lapTime': t12_delta * 0.35, 'entrySpeed': t12_delta * 8, 'brakePoint': -t12_delta * 50, 'peakBrake': t12_delta * 100, 'wallDist': t12_delta * 10, 'throttleDist': -t12_delta * 60, 'exitSpeed': t12_delta * 5},
+            'apex12': {'lapTime': t12_delta * 0.40, 'entrySpeed': t12_delta * 6, 'brakePoint': 0, 'peakBrake': t12_delta * 80, 'wallDist': -t12_delta * 8, 'throttleDist': -t12_delta * 40, 'exitSpeed': t12_delta * 4},
+            'exit2': {'lapTime': t12_delta * 0.25, 'entrySpeed': t12_delta * 3, 'brakePoint': 0, 'peakBrake': 0, 'wallDist': t12_delta * 15, 'throttleDist': -t12_delta * 30, 'exitSpeed': t12_delta * 6}
+        },
+        'turn34': {
+            'entry3': {'lapTime': t34_delta * 0.30, 'entrySpeed': t34_delta * 7, 'brakePoint': -t34_delta * 45, 'peakBrake': t34_delta * 90, 'wallDist': -t34_delta * 12, 'throttleDist': -t34_delta * 50, 'exitSpeed': t34_delta * 4},
+            'apex34': {'lapTime': t34_delta * 0.35, 'entrySpeed': t34_delta * 5, 'brakePoint': 0, 'peakBrake': t34_delta * 70, 'wallDist': t34_delta * 6, 'throttleDist': -t34_delta * 35, 'exitSpeed': t34_delta * 3},
+            'exit4': {'lapTime': t34_delta * 0.35, 'entrySpeed': t34_delta * 8, 'brakePoint': 0, 'peakBrake': 0, 'wallDist': t34_delta * 18, 'throttleDist': -t34_delta * 70, 'exitSpeed': t34_delta * 9}
+        }
+    }
 
 def load_default_data():
     drivers = {
@@ -105,120 +170,6 @@ def load_default_data():
     }
     return drivers, corner_data
 
-def parse_smt_pdf(pdf_file):
-    drivers = {}
-    corner_data = {}
-    session_info = "Uploaded Session"
-    
-    try:
-        with pdfplumber.open(pdf_file) as pdf:
-            for page_num, page in enumerate(pdf.pages):
-                text = page.extract_text()
-                if not text:
-                    continue
-                
-                title_match = re.search(r'SMT Driver Compare[:\s]+([^#]+)', text)
-                if title_match:
-                    session_info = title_match.group(1).strip()
-                
-                compare_match = re.search(r'#(\d+)\s+L[\d-]+\s+\(5 Lap Ave?:\s*([\d.]+)\)\s+vs\s+#(\d+)\s+L[\d-]+\s+\(5 Lap Ave?:\s*([\d.]+)\)', text)
-                
-                if compare_match:
-                    car1_num = compare_match.group(1)
-                    car1_lap = float(compare_match.group(2))
-                    car2_num = compare_match.group(3)
-                    car2_lap = float(compare_match.group(4))
-                    
-                    delta = car1_lap - car2_lap
-                    
-                    if car2_num not in drivers:
-                        drivers[car2_num] = {
-                            'lap': car2_lap,
-                            'delta': -delta
-                        }
-                    
-                    corner_data[car2_num] = generate_corner_data(delta)
-        
-        if not drivers:
-            st.warning("Could not extract driver data from PDF. Please check the PDF format.")
-            return None, None, None
-        
-        return drivers, corner_data, session_info
-        
-    except Exception as e:
-        st.error(f"Error parsing PDF: {str(e)}")
-        return None, None, None
-
-def generate_corner_data(total_delta):
-    import random
-    
-    t12_pct = random.uniform(0.4, 0.6)
-    t34_pct = 1 - t12_pct
-    
-    t12_delta = total_delta * t12_pct
-    t34_delta = total_delta * t34_pct
-    
-    return {
-        'turn12': {
-            'entry1': {
-                'lapTime': t12_delta * 0.35,
-                'entrySpeed': t12_delta * 8,
-                'brakePoint': -t12_delta * 50,
-                'peakBrake': t12_delta * 100,
-                'wallDist': t12_delta * 10,
-                'throttleDist': -t12_delta * 60,
-                'exitSpeed': t12_delta * 5
-            },
-            'apex12': {
-                'lapTime': t12_delta * 0.40,
-                'entrySpeed': t12_delta * 6,
-                'brakePoint': 0,
-                'peakBrake': t12_delta * 80,
-                'wallDist': -t12_delta * 8,
-                'throttleDist': -t12_delta * 40,
-                'exitSpeed': t12_delta * 4
-            },
-            'exit2': {
-                'lapTime': t12_delta * 0.25,
-                'entrySpeed': t12_delta * 3,
-                'brakePoint': 0,
-                'peakBrake': 0,
-                'wallDist': t12_delta * 15,
-                'throttleDist': -t12_delta * 30,
-                'exitSpeed': t12_delta * 6
-            }
-        },
-        'turn34': {
-            'entry3': {
-                'lapTime': t34_delta * 0.30,
-                'entrySpeed': t34_delta * 7,
-                'brakePoint': -t34_delta * 45,
-                'peakBrake': t34_delta * 90,
-                'wallDist': -t34_delta * 12,
-                'throttleDist': -t34_delta * 50,
-                'exitSpeed': t34_delta * 4
-            },
-            'apex34': {
-                'lapTime': t34_delta * 0.35,
-                'entrySpeed': t34_delta * 5,
-                'brakePoint': 0,
-                'peakBrake': t34_delta * 70,
-                'wallDist': t34_delta * 6,
-                'throttleDist': -t34_delta * 35,
-                'exitSpeed': t34_delta * 3
-            },
-            'exit4': {
-                'lapTime': t34_delta * 0.35,
-                'entrySpeed': t34_delta * 8,
-                'brakePoint': 0,
-                'peakBrake': 0,
-                'wallDist': t34_delta * 18,
-                'throttleDist': -t34_delta * 70,
-                'exitSpeed': t34_delta * 9
-            }
-        }
-    }
-
 def format_lap_time(val):
     if val == 0:
         return "Even", "even"
@@ -285,7 +236,6 @@ def display_sector_card(title, zone, data):
         st.markdown(f"{icon} **{metric_name}:** <span style='color: {color};'>{value}</span>", unsafe_allow_html=True)
 
 def main():
-    # Trackhouse logo
     st.image("Trackhouse-new-1.jpg", width=200)
     st.markdown("# Trackhouse Telemetry Analysis Tool")
     
@@ -312,20 +262,14 @@ def main():
             all_corner_data = {}
             session_info = "Uploaded Session"
             
-            with st.sidebar.status("Processing PDFs..."):
-                for uploaded_file in uploaded_files:
-                    st.write(f"Processing: {uploaded_file.name}")
-                    result = parse_smt_pdf(uploaded_file)
-                    
-                    if result is not None and len(result) == 3 and result[0] is not None:
-                        drivers, corner_data, sess_info = result
-                        all_drivers.update(drivers)
-                        all_corner_data.update(corner_data)
-                        session_info = sess_info
-                    elif result is not None and len(result) == 2:
-                        drivers, corner_data = result
-                        all_drivers.update(drivers)
-                        all_corner_data.update(corner_data)
+            for uploaded_file in uploaded_files:
+                result = parse_smt_pdf(uploaded_file)
+                
+                if result and result[0]:
+                    drivers, corner_data, sess_info = result
+                    all_drivers.update(drivers)
+                    all_corner_data.update(corner_data)
+                    session_info = sess_info
             
             if all_drivers:
                 st.session_state.drivers = all_drivers
@@ -333,15 +277,15 @@ def main():
                 st.session_state.session_info = session_info
                 st.sidebar.success(f"✅ Loaded {len(all_drivers)} competitors")
             else:
-                st.sidebar.warning("No data extracted. Using defaults.")
-                drivers, corner_data = load_default_data()
-                st.session_state.drivers = drivers
-                st.session_state.corner_data = corner_data
+                st.sidebar.error("Could not extract data from PDF. Check format.")
+                st.session_state.drivers = None
+                st.session_state.corner_data = None
         else:
             st.sidebar.info("👆 Upload PDF files to analyze")
-            st.session_state.drivers = None
-            st.session_state.corner_data = None
-    else:
+            if st.session_state.drivers is None:
+                pass  # Keep waiting for upload
+    
+    elif data_source == "Example Data":
         drivers, corner_data = load_default_data()
         st.session_state.drivers = drivers
         st.session_state.corner_data = corner_data
@@ -352,18 +296,10 @@ def main():
     session_info = st.session_state.session_info
     
     if not drivers:
-        st.info("👈 Upload a PDF file from the sidebar to get started.")
-        st.markdown("---")
-        st.markdown("### How to use:")
-        st.markdown("""
-1. Click **'Browse files'** in the sidebar
-2. Upload your SMT Driver Compare PDF(s)
-3. Select a competitor to analyze
-4. View detailed telemetry comparisons
-        """)
+        st.info("👈 Upload a PDF or select Example Data from the sidebar to get started.")
         return
     
-    st.markdown(f"*{session_info} | Reference: #1 Ross Chastain*")
+    st.markdown(f"*{session_info} | Reference: #1*")
     st.divider()
     
     st.sidebar.markdown("---")
@@ -508,7 +444,7 @@ def main():
             """)
     else:
         st.success(f"✓ **Faster Than #{selected_driver} by {driver_data['delta']:.3f}s**")
-        st.markdown("Ross Chastain has the advantage in most sections. Current approach is working well against this competitor.")
+        st.markdown("Reference car has the advantage in most sections. Current approach is working well against this competitor.")
     
     st.divider()
     st.subheader("📈 Sector Time Comparison")
@@ -524,11 +460,9 @@ def main():
     ]
     
     colors = ['#4ade80' if d > 0 else '#f87171' if d < 0 else '#9ca3af' for d in deltas]
-    text_positions = ['outside' if abs(d) < 0.07 else 'inside' for d in deltas]
     
     fig = go.Figure()
     
-    # Bar chart
     fig.add_trace(go.Bar(
         x=sectors, 
         y=deltas, 
@@ -539,10 +473,6 @@ def main():
         name='Sector Delta',
         cliponaxis=False
     ))
-    
-    # Smooth trend line using spline
-    import numpy as np
-    x_smooth = list(range(len(sectors)))
     
     fig.add_trace(go.Scatter(
         x=sectors,
